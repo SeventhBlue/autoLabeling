@@ -80,22 +80,29 @@ def autoLabeling(savePath, img, imgName=None, extraName=None, depth=3, truncated
     global savePathFolderNum
     if savePathFolderNum == -1:
         try:
-            savePathFolderNum = len(os.listdir(savePath))
+            savePathFolderNum = 0
+            fileList = os.listdir(savePath)
+            for file in fileList:        # 统计png文件的个数
+                if "png" in os.path.splitext(file)[-1]:
+                    savePathFolderNum = savePathFolderNum + 1
         except FileNotFoundError:
             os.mkdir(savePath)
             savePathFolderNum = 0
-    savePathFolderNum = savePathFolderNum + 1
-    if imgName == None:
+    if imgName == None:                  # 确定保存图片的名字
         if extraName != None:
             imgName = extraName + '_' + "{:0>6d}".format(savePathFolderNum)
         else:
             imgName = "{:0>6d}".format(savePathFolderNum)
+    else:
+        if extraName != None:
+            imgName = extraName + '_' + imgName
 
     imgPath = os.path.join(savePath, imgName + ".png")
     xmlPath = os.path.join(savePath, imgName + ".xml")
 
     locs, labels = getLabelInfo(img)
     if len(labels) > 0:
+        savePathFolderNum = savePathFolderNum + 1
         vocXMLFormat(xmlPath, imgName + ".png", img.shape[1], img.shape[0], labels, locs, depth, truncated, difficult)
         cv2.imwrite(imgPath, img)
 
@@ -145,6 +152,7 @@ def videoAnnotation(videoPath, savePath, gap=10):
     """
     cap = cv2.VideoCapture(videoPath)
     frameNum = 0
+    videoName = os.path.splitext(os.path.basename(videPath))[0]
     while True:
         ok, img = cap.read()
         frameNum = frameNum + 1
@@ -153,7 +161,7 @@ def videoAnnotation(videoPath, savePath, gap=10):
         if frameNum % gap != 0:
             continue
 
-        locs, labels = autoLabeling(savePath, img)
+        locs, labels = autoLabeling(savePath, img, extraName=videoName)
         showAnnotions(img, locs, labels)
 
         cv2.imshow('video', img)
@@ -176,7 +184,7 @@ def imagesAnnotation(imagesPath, savePath):
         imagePath = os.path.join(imagesPath, imageName)
         image = cv2.imread(imagePath)
 
-        locs, labels = autoLabeling(savePath, image, imageName)
+        locs, labels = autoLabeling(savePath, image, os.path.splitext(imageName)[0], "hah")
         showAnnotions(image, locs, labels)
 
         cv2.imshow("image", image)
@@ -186,11 +194,11 @@ def imagesAnnotation(imagesPath, savePath):
     cv2.destroyAllWindows()
 
 
-videPath = "./videos/004.avi"
-imagesPath = "C:/Users/weiz/Desktop/images"         # 图片存储文件夹
+videPath = "./videos/026.mp4"
+imagesPath = "C:/Users/weiz/Desktop/images"         # 待标注的图片
 savePath = "C:/Users/weiz/Desktop/annotions"        # 该文件可以不存在，会自动创建
 savePathFolderNum = -1                              # 所存路径文件的个数，-1表示还没有读取
 if __name__ == "__main__":
-    # videoAnnotation(videPath, savePath, 10)
+    videoAnnotation(videPath, savePath, 10)
 
-    imagesAnnotation(imagesPath, savePath)
+    #imagesAnnotation(imagesPath, savePath)
