@@ -65,9 +65,11 @@ def vocXMLFormat(filePath, imgName, imgW, imgH, objNames, locs, depth=3, truncat
     print("The {} accomplish!".format(filePath))
 
 
-def autoLabeling(savePath, img, imgName=None, extraName=None, depth=3, truncated=0, difficult=0):
+def autoLabeling(yoloModel, modelSign, savePath, img, imgName=None, extraName=None, depth=3, truncated=0, difficult=0):
     """
-    生成标注图片img的xml文件，
+    生成标注图片img的xml文件
+    :param yoloModel: yolov3或者yolov4
+    :param modelSign: 模型标识位，3表示yolov3,4表示yolov4
     :param savePath: 保存路径
     :param img: 图片
     :param imgName: 图片的名字
@@ -100,7 +102,7 @@ def autoLabeling(savePath, img, imgName=None, extraName=None, depth=3, truncated
     imgPath = os.path.join(savePath, imgName + ".png")
     xmlPath = os.path.join(savePath, imgName + ".xml")
 
-    locs, labels = getLabelInfo(img)
+    locs, labels = getLabelInfo(yoloModel, modelSign, img)
     if len(labels) > 0:
         savePathFolderNum = savePathFolderNum + 1
         vocXMLFormat(xmlPath, imgName + ".png", img.shape[1], img.shape[0], labels, locs, depth, truncated, difficult)
@@ -109,16 +111,20 @@ def autoLabeling(savePath, img, imgName=None, extraName=None, depth=3, truncated
     return locs, labels
 
 
-def getLabelInfo(img):
+def getLabelInfo(yoloModel, modelSign, img):
     """
     实现图片的检测，并返回标注信息,eg:
         labels = ["person", "TV"]
         locs = [[24, 32, 156, 145], [124, 76, 472, 384]]
+    :param yoloModel:
+    :param modelSign:
     :param img:
     :return: 返回labels和locs，格式：["目标1","目标2"...]和[[x,y,w,h],[x,y,w,h]...]
     """
-    yolov3 = yoloMain.getYolov3()
-    boxes, labels, confs, timeLabel = yoloMain.runningYolov3(yolov3, img)
+    if modelSign == 3:
+        boxes, labels, confs, timeLabel = yoloMain.runningYolov3(yoloModel, img)
+    else:
+        boxes, labels, confs, timeLabel = yoloMain.runningYolov4(yoloModel, img)
     locs = []
     if boxes == []:
         return locs, labels
@@ -142,14 +148,21 @@ def showAnnotions(image, locs, labels):
         cv2.putText(image, labels[ind], (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
 
 
-def videoAnnotation(videoPath, savePath, gap=10):
+def videoAnnotation(videoPath, savePath, gap=10, yoloModels=3):
     """
     自动标注视频数据
     :param videoPath: 视频的路径
     :param savePath: 标注后保存的路径
     :param gap: 每多少帧才标注
+    :param yoloModels: 使用yolov3或者yolov4模型，默认使用yolov3
     :return:
     """
+    if yoloModels != 4:   # 使用yolov3
+        yoloModels = yoloMain.getYolov3()
+        modelSign = 3
+    else:                 # 使用yolov4
+        yoloModels = yoloMain.getYolov4()
+        modelSign = 4
     cap = cv2.VideoCapture(videoPath)
     frameNum = 0
     videoName = os.path.splitext(os.path.basename(videPath))[0]
@@ -161,7 +174,7 @@ def videoAnnotation(videoPath, savePath, gap=10):
         if frameNum % gap != 0:
             continue
 
-        locs, labels = autoLabeling(savePath, img, extraName=videoName)
+        locs, labels = autoLabeling(yoloModels, modelSign, savePath, img, extraName=videoName)
         showAnnotions(img, locs, labels)
 
         cv2.imshow('video', img)
@@ -172,19 +185,27 @@ def videoAnnotation(videoPath, savePath, gap=10):
     cv2.destroyAllWindows()
 
 
-def imagesAnnotation(imagesPath, savePath):
+def imagesAnnotation(imagesPath, savePath, yoloModels=3):
     """
     图片自动标注
     :param imagesPath:
     :param savePath:
+    :param yoloModels:
     :return:
     """
+    if yoloModels != 4:   # 使用yolov3
+        yoloModels = yoloMain.getYolov3()
+        modelSign = 3
+    else:                 # 使用yolov4
+        yoloModels = yoloMain.getYolov4()
+        modelSign = 4
+
     imagesList = os.listdir(imagesPath)
     for imageName in imagesList:
         imagePath = os.path.join(imagesPath, imageName)
         image = cv2.imread(imagePath)
 
-        locs, labels = autoLabeling(savePath, image, os.path.splitext(imageName)[0], "hah")
+        locs, labels = autoLabeling(yoloModels, modelSign, savePath, image, os.path.splitext(imageName)[0])
         showAnnotions(image, locs, labels)
 
         cv2.imshow("image", image)
@@ -194,11 +215,12 @@ def imagesAnnotation(imagesPath, savePath):
     cv2.destroyAllWindows()
 
 
-videPath = "./videos/026.mp4"
-imagesPath = "C:/Users/weiz/Desktop/images"         # 待标注的图片
+videPath = "./videos/004.avi"
+imagesPath = "./srcImages"            # 待标注的图片
 savePath = "C:/Users/weiz/Desktop/annotions"        # 该文件可以不存在，会自动创建
 savePathFolderNum = -1                              # 所存路径文件的个数，-1表示还没有读取
+yoloMoels = 3                                       # 3表示使用yolov3模型标注，4表示使用yolov4标注
 if __name__ == "__main__":
-    videoAnnotation(videPath, savePath, 10)
+    #videoAnnotation(videPath, savePath, 10, yoloMoels)
 
-    #imagesAnnotation(imagesPath, savePath)
+    imagesAnnotation(imagesPath, savePath, yoloMoels)

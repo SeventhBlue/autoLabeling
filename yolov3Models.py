@@ -233,11 +233,11 @@ class YOLOLayer(nn.Module):
             return output, total_loss
 
 
-class Darknet(nn.Module):
+class YoloV3(nn.Module):
     """YOLOv3 object detection model"""
 
     def __init__(self, config_path, img_size=416):
-        super(Darknet, self).__init__()
+        super(YoloV3, self).__init__()
         self.module_defs = parse_model_config(config_path)
         self.hyperparams, self.module_list = create_modules(self.module_defs)
         self.yolo_layers = [layer[0] for layer in self.module_list if hasattr(layer[0], "metrics")]
