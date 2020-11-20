@@ -123,8 +123,12 @@ def getLabelInfo(yoloModel, modelSign, img):
     """
     if modelSign == 3:
         boxes, labels, confs, timeLabel = yoloMain.runningYolov3(yoloModel, img)
-    else:
+    elif modelSign == 4:
         boxes, labels, confs, timeLabel = yoloMain.runningYolov4(yoloModel, img)
+    else:
+        print("3:yolov3   4:yolov4")
+        exit()
+
     locs = []
     if boxes == []:
         return locs, labels
