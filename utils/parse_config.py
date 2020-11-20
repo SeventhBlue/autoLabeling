@@ -50,3 +50,7 @@ def parse_data_config(path):
         key, value = line.split('=')
         options[key.strip()] = value.strip()
     return options
+
+if __name__ == "__main__":
+    parseMaps = cfgRead("../cfg/yolov3.cfg")
+    print(parseMaps[0]["width"])

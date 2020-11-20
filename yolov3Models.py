@@ -74,9 +74,9 @@ def create_modules(parseMaps):
             anchors = [(anchors[i], anchors[i + 1]) for i in range(0, len(anchors), 2)]
             anchors = [anchors[i] for i in anchor_idxs]
             num_classes = int(parseMap["classes"])
-            img_size = int(hyperparams["height"])
+            imgSize = int(hyperparams["height"])
             # Define detection layer
-            yolo_layer = YOLOLayer(anchors, num_classes, img_size)
+            yolo_layer = YOLOLayer(anchors, num_classes, imgSize)
             modules.add_module(f"yolo_{module_i}", yolo_layer)
         # Register module list and number of output filters
         moduleList.append(modules)
@@ -239,7 +239,7 @@ class YoloV3(nn.Module):
         self.parseMaps = cfgRead(configPath)
         self.hyperparams, self.moduleList = create_modules(self.parseMaps)
         self.yolo_layers = [layer[0] for layer in self.moduleList if hasattr(layer[0], "metrics")]
-        self.img_size = imgSize
+        self.imgSize = imgSize
         self.seen = 0
         self.header_info = np.array([0, 0, 0, self.seen, 0], dtype=np.int32)
 

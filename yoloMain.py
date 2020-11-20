@@ -69,7 +69,7 @@ def runningYolov4(yolov4Model, image, cls=None):
     return boxes, labels, confs, timeLabel
 
 
-def getYolov3(modelPath=None, cfg=None, imgS=None):
+def getYolov3(modelPath=None, cfg=None):
     """
     获取yolov3模型
     :param yolov3ModelPath:
@@ -81,8 +81,10 @@ def getYolov3(modelPath=None, cfg=None, imgS=None):
         modelPath = yolov3ModelPath
     if cfg == None:
         cfg = yolov3Cfg
-    if imgS == None:
-        imgS = imgSize
+
+    parseMaps = cfgRead(cfg)
+    imgS = parseMaps[0]["width"]
+
 
     # set up model
     model = YoloV3(cfg, imgSize=imgS).to(device)
@@ -123,11 +125,11 @@ def runningYolov3(yolov3Model, image, cls=None):
 
     time_start = cv2.getTickCount()
     # numpy to tensor
-    tensorImage = transforms.ToTensor()(image)      # [c, h, w]
+    tensorImage = transforms.ToTensor()(image)                   # [c, h, w]
     # Pad to square resolution
-    tensorImage, _ = pad_to_square(tensorImage, 0)  # [c, max(h,w), max(h,w)]
+    tensorImage, _ = pad_to_square(tensorImage, 0)               # [c, max(h,w), max(h,w)]
     # Resize
-    tensorImage = resize(tensorImage, imgSize)      # [c, imgSzie, imgSize]
+    tensorImage = resize(tensorImage, int(yolov3Model.imgSize))  # [c, imgSzie, imgSize]
 
     # Configure input   [1, c, imgSize, imgSize]
     inputImage = Variable(torch.unsqueeze(tensorImage.type(Tensor), dim=0).float(), requires_grad=False)
@@ -140,7 +142,7 @@ def runningYolov3(yolov3Model, image, cls=None):
     if detections[0] is None:
         return [], [], [], "no object"
 
-    boxes, labels, confs = rescale_boxes(detections, imgSize, image.shape[:2], cls)
+    boxes, labels, confs = rescale_boxes(detections, int(yolov3Model.imgSize), image.shape[:2], cls)
     time_end = cv2.getTickCount()
     spend_time = (time_end - time_start) / cv2.getTickFrequency() * 1000
     fps = cv2.getTickFrequency() / (time_end - time_start)
@@ -154,18 +156,19 @@ yolov4Classes = load_classes("./cfg/yolov4_coco.names")
 yolov3ModelPath = "./cfg/yolov3.weights"      # "./cfg/yolov3.weights"   ./cfg/yolov3_hsh_food.weights
 yolov3Cfg = "./cfg/yolov3.cfg"                # "./cfg/yolov3.cfg"   "./cfg/yolov3_hsh_food.cfg"
 yolov3Classes = load_classes("./cfg/coco.names")  # "./cfg/coco.names"   "./cfg/yolov3_hsh_food.names"
-imgSize = 416
 configThres = 0.6
 nmsThres = 0.5
 if __name__ == "__main__":
     img = cv2.imread("./srcImages/dog.jpg")
-    yolov3 = getYolov3(yolov3ModelPath, yolov3Cfg, imgSize)
+    yolov3 = getYolov3(yolov3ModelPath, yolov3Cfg)
 
+    # yolov3图片检测
     boxes, labels, confs, timeLabel = runningYolov3(yolov3, img, yolov3Classes)
     img = showResult(img, boxes, labels, confs, timeLabel)
     cv2.imshow('det', img)
     cv2.waitKey()
 
+    # yolov3的视频检测
     # cap = cv2.VideoCapture("./videos/026.mp4")
     # frameNum = 0
     # gap = 1
@@ -184,6 +187,7 @@ if __name__ == "__main__":
     #         cap.release()  # 关闭摄像头
     #         break
 
+    # yolov4的视频检测
     # yolov4 = getYolov4(yolov4ModelPath, yolov4Cfg)
     # cap = cv2.VideoCapture("./videos/004.avi")
     # frameNum = 0

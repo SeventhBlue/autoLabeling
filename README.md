@@ -11,13 +11,13 @@
 
 	1.放置自己的权重；
 	
-	2.修改yoloMain.py读取文件的路径，及对应imgSize的大小（该值大小应和yolov3.cfg文件height&width的大小一样）；
+	2.修改yoloMain.py读取文件的路径，包括权重、配置、类别文件的路径；
 	
 	3.测试yoloMain.py是否正常；
 	
 # 三、自动标注数据
 
-	设置相应的路径，运行dataLabeling.py；
+	设置标注文件保存的路径，运行dataLabeling.py；
 	
 	
 # 20201118添加yolov4模型的自动标注
