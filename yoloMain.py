@@ -85,7 +85,7 @@ def getYolov3(modelPath=None, cfg=None, imgS=None):
         imgS = imgSize
 
     # set up model
-    model = YoloV3(cfg, img_size=imgS).to(device)
+    model = YoloV3(cfg, imgSize=imgS).to(device)
 
     model.load_darknet_weights(modelPath)
 
@@ -114,7 +114,7 @@ def runningYolov3(yolov3Model, image, cls=None):
     """
     运行yolov3模型
     :param yolov3Model:
-    :param image:
+    :param image: [h w c]
     :param cls:
     :return:
     """
@@ -123,14 +123,14 @@ def runningYolov3(yolov3Model, image, cls=None):
 
     time_start = cv2.getTickCount()
     # numpy to tensor
-    tensorImage = transforms.ToTensor()(image)
+    tensorImage = transforms.ToTensor()(image)      # [c, h, w]
     # Pad to square resolution
-    tensorImage, _ = pad_to_square(tensorImage, 0)
+    tensorImage, _ = pad_to_square(tensorImage, 0)  # [c, max(h,w), max(h,w)]
     # Resize
-    tensorImage = resize(tensorImage, imgSize)
+    tensorImage = resize(tensorImage, imgSize)      # [c, imgSzie, imgSize]
 
-    # Configure input
-    inputImage = Variable(torch.unsqueeze(tensorImage.type(Tensor), dim=0).float(), requires_grad = False)
+    # Configure input   [1, c, imgSize, imgSize]
+    inputImage = Variable(torch.unsqueeze(tensorImage.type(Tensor), dim=0).float(), requires_grad=False)
 
     # Get detections
     with torch.no_grad():
@@ -151,15 +151,21 @@ def runningYolov3(yolov3Model, image, cls=None):
 yolov4ModelPath = "./cfg/yolov4_coco.weights"
 yolov4Cfg = "./cfg/yolov4_coco.cfg"
 yolov4Classes = load_classes("./cfg/yolov4_coco.names")
-yolov3ModelPath = "./cfg/yolov3_hsh_food.weights"      # "./cfg/yolov3.weights"
-yolov3Cfg = "./cfg/yolov3_hsh_food.cfg"                # "./cfg/yolov3.cfg"
-yolov3Classes = load_classes("./cfg/yolov3_hsh_food.names")  # "./cfg/coco.names"
+yolov3ModelPath = "./cfg/yolov3.weights"      # "./cfg/yolov3.weights"   ./cfg/yolov3_hsh_food.weights
+yolov3Cfg = "./cfg/yolov3.cfg"                # "./cfg/yolov3.cfg"   "./cfg/yolov3_hsh_food.cfg"
+yolov3Classes = load_classes("./cfg/coco.names")  # "./cfg/coco.names"   "./cfg/yolov3_hsh_food.names"
 imgSize = 416
 configThres = 0.6
 nmsThres = 0.5
 if __name__ == "__main__":
     img = cv2.imread("./srcImages/dog.jpg")
-    # yolov3 = getYolov3(yolov3ModelPath, yolov3Cfg, imgSize)
+    yolov3 = getYolov3(yolov3ModelPath, yolov3Cfg, imgSize)
+
+    boxes, labels, confs, timeLabel = runningYolov3(yolov3, img, yolov3Classes)
+    img = showResult(img, boxes, labels, confs, timeLabel)
+    cv2.imshow('det', img)
+    cv2.waitKey()
+
     # cap = cv2.VideoCapture("./videos/026.mp4")
     # frameNum = 0
     # gap = 1
@@ -170,7 +176,7 @@ if __name__ == "__main__":
     #         break
     #     if frameNum % gap != 0:
     #         continue
-    #     boxes, labels, confs, timeLabel = runningYolov3(yolov3, img, classes)
+    #     boxes, labels, confs, timeLabel = runningYolov3(yolov3, img, yolov3Classes)
     #     img = showResult(img, boxes, labels, confs, timeLabel)
     #     cv2.imshow('video', img)
     #
@@ -178,21 +184,21 @@ if __name__ == "__main__":
     #         cap.release()  # 关闭摄像头
     #         break
 
-    yolov4 = getYolov4(yolov4ModelPath, yolov4Cfg)
-    cap = cv2.VideoCapture("./videos/004.avi")
-    frameNum = 0
-    gap = 1
-    while True:
-        ok, img = cap.read()
-        frameNum = frameNum + 1
-        if not ok:
-            break
-        if frameNum % gap != 0:
-            continue
-        boxes, labels, confs, timeLabel = runningYolov4(yolov4, img, yolov4Classes)
-        img = showResult(img, boxes, labels, confs, timeLabel)
-        cv2.imshow('video', img)
-
-        if cv2.waitKey(1) & 0xFF == 27:
-            cap.release()  # 关闭摄像头
-            break
+    # yolov4 = getYolov4(yolov4ModelPath, yolov4Cfg)
+    # cap = cv2.VideoCapture("./videos/004.avi")
+    # frameNum = 0
+    # gap = 1
+    # while True:
+    #     ok, img = cap.read()
+    #     frameNum = frameNum + 1
+    #     if not ok:
+    #         break
+    #     if frameNum % gap != 0:
+    #         continue
+    #     boxes, labels, confs, timeLabel = runningYolov4(yolov4, img, yolov4Classes)
+    #     img = showResult(img, boxes, labels, confs, timeLabel)
+    #     cv2.imshow('video', img)
+    #
+    #     if cv2.waitKey(1) & 0xFF == 27:
+    #         cap.release()  # 关闭摄像头
+    #         break

@@ -15,20 +15,20 @@ from utils.parse_config import *
 from utils.utils import build_targets, to_cpu, non_max_suppression
 
 
-def create_modules(module_defs):
+def create_modules(parseMaps):
     """
-    Constructs module list of layer blocks from module configuration in module_defs
+    Constructs module list of layer blocks from module configuration in parseMaps
     """
-    hyperparams = module_defs.pop(0)
+    hyperparams = parseMaps.pop(0)
     output_filters = [int(hyperparams["channels"])]
-    module_list = nn.ModuleList()
-    for module_i, module_def in enumerate(module_defs):
+    moduleList = nn.ModuleList()
+    for module_i, parseMap in enumerate(parseMaps):
         modules = nn.Sequential()
 
-        if module_def["type"] == "convolutional":
-            bn = int(module_def["batch_normalize"])
-            filters = int(module_def["filters"])
-            kernel_size = int(module_def["size"])
+        if parseMap["type"] == "convolutional":
+            bn = int(parseMap["batch_normalize"])
+            filters = int(parseMap["filters"])
+            kernel_size = int(parseMap["size"])
             pad = (kernel_size - 1) // 2
             modules.add_module(
                 f"conv_{module_i}",
@@ -36,53 +36,53 @@ def create_modules(module_defs):
                     in_channels=output_filters[-1],
                     out_channels=filters,
                     kernel_size=kernel_size,
-                    stride=int(module_def["stride"]),
+                    stride=int(parseMap["stride"]),
                     padding=pad,
                     bias=not bn,
                 ),
             )
             if bn:
                 modules.add_module(f"batch_norm_{module_i}", nn.BatchNorm2d(filters, momentum=0.9, eps=1e-5))
-            if module_def["activation"] == "leaky":
+            if parseMap["activation"] == "leaky":
                 modules.add_module(f"leaky_{module_i}", nn.LeakyReLU(0.1))
 
-        elif module_def["type"] == "maxpool":
-            kernel_size = int(module_def["size"])
-            stride = int(module_def["stride"])
+        elif parseMap["type"] == "maxpool":
+            kernel_size = int(parseMap["size"])
+            stride = int(parseMap["stride"])
             if kernel_size == 2 and stride == 1:
                 modules.add_module(f"_debug_padding_{module_i}", nn.ZeroPad2d((0, 1, 0, 1)))
             maxpool = nn.MaxPool2d(kernel_size=kernel_size, stride=stride, padding=int((kernel_size - 1) // 2))
             modules.add_module(f"maxpool_{module_i}", maxpool)
 
-        elif module_def["type"] == "upsample":
-            upsample = Upsample(scale_factor=int(module_def["stride"]), mode="nearest")
+        elif parseMap["type"] == "upsample":
+            upsample = Upsample(scale_factor=int(parseMap["stride"]), mode="nearest")
             modules.add_module(f"upsample_{module_i}", upsample)
 
-        elif module_def["type"] == "route":
-            layers = [int(x) for x in module_def["layers"].split(",")]
+        elif parseMap["type"] == "route":
+            layers = [int(x) for x in parseMap["layers"].split(",")]
             filters = sum([output_filters[1:][i] for i in layers])
             modules.add_module(f"route_{module_i}", EmptyLayer())
 
-        elif module_def["type"] == "shortcut":
-            filters = output_filters[1:][int(module_def["from"])]
+        elif parseMap["type"] == "shortcut":
+            filters = output_filters[1:][int(parseMap["from"])]
             modules.add_module(f"shortcut_{module_i}", EmptyLayer())
 
-        elif module_def["type"] == "yolo":
-            anchor_idxs = [int(x) for x in module_def["mask"].split(",")]
+        elif parseMap["type"] == "yolo":
+            anchor_idxs = [int(x) for x in parseMap["mask"].split(",")]
             # Extract anchors
-            anchors = [int(x) for x in module_def["anchors"].split(",")]
+            anchors = [int(x) for x in parseMap["anchors"].split(",")]
             anchors = [(anchors[i], anchors[i + 1]) for i in range(0, len(anchors), 2)]
             anchors = [anchors[i] for i in anchor_idxs]
-            num_classes = int(module_def["classes"])
+            num_classes = int(parseMap["classes"])
             img_size = int(hyperparams["height"])
             # Define detection layer
             yolo_layer = YOLOLayer(anchors, num_classes, img_size)
             modules.add_module(f"yolo_{module_i}", yolo_layer)
         # Register module list and number of output filters
-        module_list.append(modules)
+        moduleList.append(modules)
         output_filters.append(filters)
 
-    return hyperparams, module_list
+    return hyperparams, moduleList
 
 
 class Upsample(nn.Module):
@@ -234,14 +234,12 @@ class YOLOLayer(nn.Module):
 
 
 class YoloV3(nn.Module):
-    """YOLOv3 object detection model"""
-
-    def __init__(self, config_path, img_size=416):
+    def __init__(self, configPath, imgSize=416):
         super(YoloV3, self).__init__()
-        self.module_defs = parse_model_config(config_path)
-        self.hyperparams, self.module_list = create_modules(self.module_defs)
-        self.yolo_layers = [layer[0] for layer in self.module_list if hasattr(layer[0], "metrics")]
-        self.img_size = img_size
+        self.parseMaps = cfgRead(configPath)
+        self.hyperparams, self.moduleList = create_modules(self.parseMaps)
+        self.yolo_layers = [layer[0] for layer in self.moduleList if hasattr(layer[0], "metrics")]
+        self.img_size = imgSize
         self.seen = 0
         self.header_info = np.array([0, 0, 0, self.seen, 0], dtype=np.int32)
 
@@ -249,15 +247,15 @@ class YoloV3(nn.Module):
         img_dim = x.shape[2]
         loss = 0
         layer_outputs, yolo_outputs = [], []
-        for i, (module_def, module) in enumerate(zip(self.module_defs, self.module_list)):
-            if module_def["type"] in ["convolutional", "upsample", "maxpool"]:
+        for i, (parseMap, module) in enumerate(zip(self.parseMaps, self.moduleList)):
+            if parseMap["type"] in ["convolutional", "upsample", "maxpool"]:
                 x = module(x)
-            elif module_def["type"] == "route":
-                x = torch.cat([layer_outputs[int(layer_i)] for layer_i in module_def["layers"].split(",")], 1)
-            elif module_def["type"] == "shortcut":
-                layer_i = int(module_def["from"])
+            elif parseMap["type"] == "route":
+                x = torch.cat([layer_outputs[int(layer_i)] for layer_i in parseMap["layers"].split(",")], 1)
+            elif parseMap["type"] == "shortcut":
+                layer_i = int(parseMap["from"])
                 x = layer_outputs[-1] + layer_outputs[layer_i]
-            elif module_def["type"] == "yolo":
+            elif parseMap["type"] == "yolo":
                 x, layer_loss = module[0](x, targets, img_dim)
                 loss += layer_loss
                 yolo_outputs.append(x)
@@ -281,12 +279,12 @@ class YoloV3(nn.Module):
             cutoff = 75
 
         ptr = 0
-        for i, (module_def, module) in enumerate(zip(self.module_defs, self.module_list)):
+        for i, (parseMap, module) in enumerate(zip(self.parseMaps, self.moduleList)):
             if i == cutoff:
                 break
-            if module_def["type"] == "convolutional":
+            if parseMap["type"] == "convolutional":
                 conv_layer = module[0]
-                if module_def["batch_normalize"]:
+                if parseMap["batch_normalize"]:
                     # Load BN bias, weights, running mean and running variance
                     bn_layer = module[1]
                     num_b = bn_layer.bias.numel()  # Number of biases
@@ -328,11 +326,11 @@ class YoloV3(nn.Module):
         self.header_info.tofile(fp)
 
         # Iterate through layers
-        for i, (module_def, module) in enumerate(zip(self.module_defs[:cutoff], self.module_list[:cutoff])):
-            if module_def["type"] == "convolutional":
+        for i, (parseMap, module) in enumerate(zip(self.parseMaps[:cutoff], self.moduleList[:cutoff])):
+            if parseMap["type"] == "convolutional":
                 conv_layer = module[0]
                 # If batch norm, load bn first
-                if module_def["batch_normalize"]:
+                if parseMap["batch_normalize"]:
                     bn_layer = module[1]
                     bn_layer.bias.data.cpu().numpy().tofile(fp)
                     bn_layer.weight.data.cpu().numpy().tofile(fp)
