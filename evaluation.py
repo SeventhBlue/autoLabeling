@@ -110,7 +110,7 @@ def evaluation(path, modelSign):
 
 def linePlot(X, Y):
     """
-    线图
+    算法准确性折线图
     :param X:
     :param Y:
     :return:
@@ -129,7 +129,7 @@ def linePlot(X, Y):
 
 def barPlot(labels, labelNumT, labelNumMin, labelNumF):
     """
-    画条形图
+    条形堆积图
     :param labels:标签
     :param labelNumT:预测正确且IOU大于等于0.5情况下的个数
     :param labelNumMin:预测正确但是IOU小于0.5情况的个数
